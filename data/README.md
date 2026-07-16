@@ -1,26 +1,54 @@
 # Data Directory
 
-Place authorised local research data in this directory. Data files are ignored by Git because the recovered historical workbooks contain row-level HCC radiomics and TCGA-style patient/sample information.
+Place the authorised local analysis dataset here:
 
-## Expected Analysis Dataset
+```text
+data/hcc_radiomics.xlsx
+```
 
-The main command expects a tabular `.xlsx`, `.csv`, or `.tsv` file with:
+Accepted formats are `.xlsx`, `.xls`, `.csv`, `.tsv`, and tab-delimited `.txt`.
 
-- one target column, typically `Stage`;
-- numeric radiomics feature columns;
-- optional identifier or metadata columns such as `patient_id`, `case_id`, `record_id`, or acquisition metadata.
+## Expected Dataset
 
-Identifier and metadata columns should be passed with `--metadata-column` and, when repeated patient records exist, `--group-column` so grouped splitting can keep a patient out of multiple splits.
+- Approximately 40 patients.
+- Approximately 662 radiomics predictors.
+- One row per patient.
+- Target column: `Stage`.
+- Confirmed binary mapping:
+  - `0` = HCC groups/stages 1-2
+  - `1` = HCC groups/stages 3-4
 
-## Privacy
+All approved numeric columns other than `Stage` are treated as candidate predictors unless explicitly excluded as metadata.
 
-Do not commit patient identifiers, protected health information, accessions, dates of birth, clinical free text, credentials, local machine paths, or private institutional metadata. Authorised researchers should provide the dataset locally after confirming governance and ethics requirements.
+## Metadata Columns
+
+Use `--metadata-column` to exclude approved non-predictor columns:
+
+```bash
+python -m hcc_radiomics.cli --data-path data/hcc_radiomics.xlsx --target-column Stage --metadata-column scanner_model --method dummy
+```
+
+A patient or group column is not required for the current dataset because each row is a different patient. If a future dataset contains repeated rows per patient, pass `--group-column` so grouped splitting keeps a group out of multiple splits.
+
+## Privacy And Governance
+
+Data files are ignored by Git because the repository must not distribute real patient-level data. Do not commit Excel workbooks, CSV/TSV exports, row-level derived data, patient identifiers, accessions, dates of birth, clinical free text, credentials, private institutional metadata, or local machine paths.
+
+Authorised researchers should provide the dataset locally only after confirming governance, ethics, and data-sharing requirements.
 
 ## Historical Files
 
-The original commit `33aa78fd27bee2ec88f34037beaf104f39fcc64c` contained:
+Historical commit `33aa78fd27bee2ec88f34037beaf104f39fcc64c` contained:
 
-- `Pycharm copy.xlsx`: a 40-row by 663-column stage-labelled radiomics table with binary `Stage` values in the inspected sheet.
-- `LiverHccSeg (Open Source).xlsx`: multiple TCGA-style patient/sample sheets and segmentation feature sheets.
+- `Pycharm copy.xlsx`
+- `LiverHccSeg (Open Source).xlsx`
 
-Both files were deliberately excluded from the rebuilt repository because they are data-bearing workbooks.
+These workbooks were deliberately excluded from the rebuilt branch because they are data-bearing files.
+
+## Quick Validation Command
+
+Run a dummy baseline to validate schema, splitting, and output generation without claiming real model performance:
+
+```bash
+python -m hcc_radiomics.cli --data-path data/hcc_radiomics.xlsx --target-column Stage --method dummy --output-dir outputs/data_check
+```

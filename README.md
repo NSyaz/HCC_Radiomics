@@ -1,181 +1,218 @@
 # HCC Radiomics Classification
 
-This repository contains a rebuilt, leakage-aware machine-learning workflow for hepatocellular carcinoma (HCC) radiomics classification. The historical project intent was to classify HCC stage from radiomics features using SVM models with ANOVA F-test / `SelectKBest` and Binary Particle Swarm Optimisation (BPSO) feature selection.
+This repository provides a reproducible machine-learning workflow for binary hepatocellular carcinoma (HCC) stage-group classification using radiomics features.
 
-## Project Status
+The confirmed target column is `Stage`:
 
-The repository was recovered from historical commit `33aa78fd27bee2ec88f34037beaf104f39fcc64c` after later commits removed the uploaded project files. The active implementation has been restructured into a Python package under `src/hcc_radiomics`. Historical scripts are preserved in `legacy/` for audit only and are not the supported workflow.
+- `0` = HCC groups/stages 1-2
+- `1` = HCC groups/stages 3-4
 
-Real-data validation has not been performed in this rebuild because the recovered Excel workbooks contain row-level research data and were deliberately excluded from Git.
+The software preserves this mapping and does not reinterpret or transform the target definition.
+
+## Project Overview
+
+The repository has been recovered and reorganised into a compact scientific Python project. It is designed to let authorised researchers run leakage-aware HCC radiomics experiments locally while keeping real patient-level data out of GitHub.
+
+## Research Objective
+
+The planned modelling comparison focuses on five methods:
+
+- `dummy`: stratified dummy baseline;
+- `svm`: SVM without feature selection;
+- `svm_kbest`: ANOVA F-test / `SelectKBest` followed by SVM;
+- `svm_bpso`: Binary Particle Swarm Optimisation (BPSO) followed by SVM;
+- `svm_kbest_bpso`: ANOVA F-test followed by BPSO and SVM.
+
+The scientific objective is to compare these methods on the same train, validation, and test splits without fitting preprocessing, feature selection, BPSO, or model parameters on the final test set.
+
+## Dataset Characteristics
+
+The primary analysis dataset is expected to contain:
+
+- approximately 40 patients;
+- approximately 662 radiomics predictors;
+- one row per patient;
+- the binary target column `Stage`;
+- no repeated patient rows in the current analysis dataset.
+
+This is a high-dimensional, low-sample-size problem. Real patient-level data are not distributed in this repository.
+
+## Important Scientific Caution
+
+The number of predictors is much larger than the number of patients, so overfitting risk is high. Feature selection and model evaluation must occur strictly within training data or training cross-validation. Single train/test split results should not be overinterpreted. Final scientific reporting should include uncertainty, repeated validation, or nested cross-validation where appropriate.
+
+## Repository Status
+
+- Recovered from historical commit `33aa78fd27bee2ec88f34037beaf104f39fcc64c`.
+- Active implementation lives under `src/hcc_radiomics`.
+- Historical scripts are preserved under `legacy/` for audit only.
+- Synthetic tests pass without private data.
+- Real-data experiments have not yet been finalised.
+- No real-data model performance is claimed.
 
 ## Repository Structure
 
 ```text
-.
-├── configs/default.yaml
-├── data/README.md
-├── legacy/
-├── outputs/.gitkeep
-├── scripts/run_experiment.py
-├── src/hcc_radiomics/
-│   ├── cli.py
-│   ├── data.py
-│   ├── evaluation.py
-│   ├── feature_selection.py
-│   ├── models.py
-│   └── preprocessing.py
-└── tests/
+HCC_Radiomics/
+|-- .github/
+|   |-- ISSUE_TEMPLATE/
+|   |   |-- bug_report.yml
+|   |   `-- experiment_request.yml
+|   |-- workflows/
+|   |   `-- tests.yml
+|   `-- pull_request_template.md
+|-- configs/
+|   `-- default.yaml
+|-- data/
+|   |-- .gitkeep
+|   `-- README.md
+|-- docs/
+|   |-- experiment_plan.md
+|   `-- methodology.md
+|-- legacy/
+|   |-- README.md
+|   |-- Classifiers using BPSO.py
+|   |-- SVM (3 Feature Selector).py
+|   |-- TPOT (Thesis).py
+|   `-- Test Code.py
+|-- outputs/
+|   `-- .gitkeep
+|-- scripts/
+|   `-- run_experiment.py
+|-- src/
+|   `-- hcc_radiomics/
+|       |-- __init__.py
+|       |-- cli.py
+|       |-- data.py
+|       |-- evaluation.py
+|       |-- feature_selection.py
+|       |-- models.py
+|       `-- preprocessing.py
+|-- tests/
+|-- .gitignore
+|-- CITATION.cff
+|-- README.md
+`-- pyproject.toml
 ```
-
-## Research Objective
-
-The implemented workflow supports supervised classification of HCC stage labels from numeric radiomics features. It is intended to help researchers run reproducible experiments while preventing common sources of optimistic bias, especially feature-selection and model-fitting leakage from the final test set.
-
-## Machine-Learning Workflow
-
-The pipeline:
-
-1. loads a local tabular dataset;
-2. validates the target column and numeric feature columns;
-3. excludes target, identifier, and metadata columns from predictors;
-4. creates reproducible train, validation, and final test splits;
-5. fits imputation, zero-variance filtering, and scaling on training data only;
-6. optionally applies ANOVA `SelectKBest`;
-7. optionally applies BPSO feature selection using training cross-validation only;
-8. trains an SVM classifier on the selected training features;
-9. evaluates validation and final test splits without refitting on test data;
-10. saves metrics, figures, selected features, predictions, configuration, and model artifacts.
-
-## Dataset Requirements
-
-Provide an authorised local `.xlsx`, `.csv`, or `.tsv` dataset. The default target column is `Stage`, but this can be changed with `--target-column`.
-
-Required columns:
-
-- a target column such as `Stage`;
-- numeric radiomics feature columns.
-
-Optional columns:
-
-- patient or case identifiers;
-- clinical or acquisition metadata;
-- a grouping column for repeated patient records.
-
-Pass identifiers and metadata with `--metadata-column`. If multiple rows can belong to the same patient, pass `--group-column` so grouped splitting prevents patient overlap between train, validation, and test sets.
-
-## Privacy And Governance
-
-Do not commit patient identifiers, protected health information, accession numbers, dates of birth, clinical free text, credentials, private institutional metadata, or row-level research data. The historical data workbooks were inspected and excluded from this rebuild. Authorised researchers should place approved local data under `data/` after confirming ethics, governance, and data-sharing requirements.
 
 ## Installation
 
-Use Python 3.10 or newer.
+Windows PowerShell:
 
-```bash
+```powershell
 python -m venv .venv
-.venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-On macOS or Linux, activate with `source .venv/bin/activate`.
-
-## Example Commands
-
-Run the default SVM + BPSO workflow:
+macOS/Linux:
 
 ```bash
-python -m hcc_radiomics.cli ^
-  --data-path data/hcc_radiomics.xlsx ^
-  --target-column Stage ^
-  --method svm_bpso ^
-  --output-dir outputs/run_001 ^
-  --random-state 42
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
 ```
 
-Run ANOVA F-test followed by BPSO:
+## Dataset Preparation
+
+Place the authorised local analysis dataset at:
+
+```text
+data/hcc_radiomics.xlsx
+```
+
+Accepted formats are `.xlsx`, `.xls`, `.csv`, `.tsv`, and tab-delimited `.txt`.
+
+The expected target column is `Stage`:
+
+- `0` = HCC groups/stages 1-2
+- `1` = HCC groups/stages 3-4
+
+All approved numeric columns other than `Stage` are treated as candidate radiomics predictors unless excluded with `--metadata-column`. A patient or group column is not required for the current dataset because each row is a different patient, but optional grouped splitting remains available through `--group-column` for future datasets.
+
+## Running Experiments
+
+Dummy baseline:
 
 ```bash
-python -m hcc_radiomics.cli ^
-  --data-path data/hcc_radiomics.xlsx ^
-  --target-column Stage ^
-  --method svm_kbest_bpso ^
-  --k-best 150 ^
-  --output-dir outputs/run_002
+python -m hcc_radiomics.cli --data-path data/hcc_radiomics.xlsx --target-column Stage --method dummy --output-dir outputs/dummy
 ```
 
-Use a config file:
+Plain SVM:
+
+```bash
+python -m hcc_radiomics.cli --data-path data/hcc_radiomics.xlsx --target-column Stage --method svm --output-dir outputs/svm
+```
+
+ANOVA F-test plus SVM:
+
+```bash
+python -m hcc_radiomics.cli --data-path data/hcc_radiomics.xlsx --target-column Stage --method svm_kbest --k-best 10 --output-dir outputs/svm_kbest
+```
+
+BPSO plus SVM:
+
+```bash
+python -m hcc_radiomics.cli --data-path data/hcc_radiomics.xlsx --target-column Stage --method svm_bpso --output-dir outputs/svm_bpso
+```
+
+ANOVA F-test plus BPSO plus SVM:
+
+```bash
+python -m hcc_radiomics.cli --data-path data/hcc_radiomics.xlsx --target-column Stage --method svm_kbest_bpso --k-best 10 --output-dir outputs/svm_kbest_bpso
+```
+
+Use the default configuration file:
 
 ```bash
 python -m hcc_radiomics.cli --config configs/default.yaml
 ```
 
-## Methods
+## Outputs
 
-Available methods:
+Each run creates its output directory and writes:
 
-- `svm`: preprocessing plus SVM;
-- `svm_kbest`: preprocessing, ANOVA `SelectKBest`, SVM;
-- `svm_bpso`: preprocessing, BPSO feature selection, SVM;
-- `svm_kbest_bpso`: preprocessing, ANOVA `SelectKBest`, BPSO feature selection, SVM.
+- `config_used.json`
+- `dataset_summary.json`
+- `split_class_distributions.json`
+- `selected_features.txt`
+- `metrics.json`
+- `test_predictions.csv`
+- `confusion_matrix.png`
+- `roc_curve.png`
+- `precision_recall_curve.png`
+- `model.joblib`
+- `run.log`
 
-`SelectKBest` validates `k` and clamps it to the available feature count with a warning. BPSO evaluates only selected feature masks; all-zero masks receive a penalty and are never treated as all features selected.
+## Evaluation Strategy
 
-## Evaluation Metrics
+The current implementation supports leakage-safe train, validation, and final test splitting. Preprocessing, imputation, scaling, ANOVA feature selection, BPSO, and classifier fitting are fitted only on training data or training cross-validation. The final test split is used only for evaluation.
 
-The pipeline reports accuracy, balanced accuracy, precision, recall/sensitivity, specificity, F1-score, confusion matrix, selected feature count, ROC-AUC, and average precision where valid. ROC-AUC and precision-recall metrics use probabilities, not hard class labels. Multiclass targets are evaluated with macro summaries and one-vs-rest probability metrics where valid.
-
-## Output Files
-
-Each run creates the output directory automatically and writes:
-
-- `config_used.json`;
-- `dataset_summary.json`;
-- `split_class_distributions.json`;
-- `selected_features.txt`;
-- `metrics.json`;
-- `test_predictions.csv` with safe row indices;
-- `confusion_matrix.png`;
-- `roc_curve.png`;
-- `precision_recall_curve.png`;
-- `model.joblib`;
-- `run.log`.
-
-## Reproducibility
-
-Set `--random-state` to control dataset splitting and BPSO randomness. The split code checks that train, validation, and test row indices do not overlap. The final test split is used only for evaluation.
+Because the dataset is very small relative to the number of predictors, final real-data conclusions should use repeated stratified validation or nested cross-validation before reporting scientific claims. Nested cross-validation is recommended for the final study design but is not implemented in this repository yet.
 
 ## Testing
 
-Tests use synthetic data only and do not require private research data.
+Tests use synthetic data only and do not require private research data:
 
 ```bash
 python -m compileall .
 pytest -q
 ```
 
-## Known Limitations
+## Data Privacy
 
-- The real HCC dataset is not included and has not been validated in this branch.
-- BPSO can be computationally expensive for hundreds of features; increase particles and iterations carefully.
-- The project does not define a clinical stage-conversion rule. It uses the labels supplied in the target column.
-- TPOT experiments from the historical scripts were not restored as active functionality because they were exploratory and leakage-prone.
+Real research data are ignored by Git and must remain local. Do not commit Excel workbooks, CSV exports, TSV files, patient identifiers, clinical free text, accessions, dates of birth, credentials, private institutional metadata, or derived row-level patient data.
 
-## Troubleshooting
+## Legacy Code
 
-- If `Stage` is missing, pass the correct target name with `--target-column`.
-- If repeated patient records exist, provide `--group-column`.
-- If `SelectKBest` warns about `k`, reduce `--k-best` or confirm that clamping is acceptable.
-- If ROC-AUC is unavailable, check whether the test split contains all classes and whether the model produced probabilities.
+The original scripts are retained in `legacy/` so reviewers can audit the recovered history. They contain hard-coded local paths and known leakage-prone modelling patterns, so they must not be used as the active pipeline.
 
 ## Citation
 
-No publication details or formal citation metadata were available in the recovered repository. Add manuscript, dataset, and software citations here when confirmed by the maintainers.
+Citation metadata are provided in `CITATION.cff`. No manuscript details, DOI, journal name, institution, or author affiliation are available in the repository at this time.
 
 ## Licence
 
-No licence file was present in the recovered history. Reuse and redistribution rights are therefore unclear until the repository owner adds an explicit licence.
-
-## Maintainer
-
-Repository owner: `NSyaz/HCC_Radiomics`. Historical commits list GitHub user `NSyaz` as the uploader.
+No licence has yet been selected. All rights remain with the repository owner unless an explicit licence is later added.
