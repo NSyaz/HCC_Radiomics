@@ -3,13 +3,13 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from hcc_radiomics.data import split_dataset, validate_dataset
+from hcc_radiomics.data import STAGE_TARGET_MAPPING, split_dataset, validate_dataset
 
 
 def test_target_column_is_excluded_from_features() -> None:
     df = pd.DataFrame(
         {
-            "patient_id": ["p1", "p2", "p3", "p4"],
+            "row_label": ["s1", "s2", "s3", "s4"],
             "Stage": [0, 1, 0, 1],
             "feature_a": [1.0, 2.0, 3.0, 4.0],
             "feature_b": [4.0, 3.0, 2.0, 1.0],
@@ -17,14 +17,25 @@ def test_target_column_is_excluded_from_features() -> None:
     )
 
     X, y, feature_names, summary = validate_dataset(
-        df, "Stage", metadata_columns=["patient_id"]
+        df, "Stage", metadata_columns=["row_label"]
     )
 
     assert "Stage" not in X.columns
-    assert "patient_id" not in X.columns
+    assert "row_label" not in X.columns
     assert feature_names == ["feature_a", "feature_b"]
     assert y.tolist() == [0, 1, 0, 1]
-    assert summary["metadata_columns_excluded"] == ["patient_id"]
+    assert summary["metadata_columns_excluded"] == ["row_label"]
+    assert summary["stage_target_mapping"] == {
+        "0": "HCC groups/stages 1-2",
+        "1": "HCC groups/stages 3-4",
+    }
+
+
+def test_target_mapping_constant_remains_binary() -> None:
+    assert STAGE_TARGET_MAPPING == {
+        0: "HCC groups/stages 1-2",
+        1: "HCC groups/stages 3-4",
+    }
 
 
 def test_missing_or_single_class_target_is_rejected() -> None:
@@ -42,3 +53,26 @@ def test_split_indices_do_not_overlap() -> None:
     assert set(split.train_idx).isdisjoint(split.validation_idx)
     assert set(split.train_idx).isdisjoint(split.test_idx)
     assert set(split.validation_idx).isdisjoint(split.test_idx)
+
+
+def test_high_dimensional_warning_is_emitted() -> None:
+    df = pd.DataFrame({f"f{i}": range(8) for i in range(10)})
+    df["Stage"] = [0, 1] * 4
+
+    with pytest.warns(RuntimeWarning, match="more features"):
+        validate_dataset(df, "Stage")
+
+
+def test_extreme_feature_sample_warning_is_emitted() -> None:
+    df = pd.DataFrame({f"f{i}": range(8) for i in range(80)})
+    df["Stage"] = [0, 1] * 4
+
+    with pytest.warns(RuntimeWarning, match="extreme high-dimensional"):
+        validate_dataset(df, "Stage")
+
+
+def test_impossible_stratified_split_raises_clear_error() -> None:
+    y = pd.Series([0, 0, 1])
+
+    with pytest.raises(ValueError, match="at least 3 samples per class"):
+        split_dataset(y, test_size=0.2, validation_size=0.2, random_state=42)

@@ -7,6 +7,7 @@ from sklearn.datasets import make_classification
 from hcc_radiomics.feature_selection import (
     BinaryPSOFeatureSelector,
     bpso_mask_cost,
+    resolve_cv_folds,
     safe_select_k_best,
 )
 
@@ -60,3 +61,15 @@ def test_all_zero_bpso_mask_gets_penalty() -> None:
     cost = bpso_mask_cost(np.zeros(4, dtype=int), X, y, zero_penalty=1.23)
 
     assert cost == 1.23
+
+
+def test_impossible_cv_folds_raise_clear_error() -> None:
+    with pytest.raises(ValueError, match="at least 2 training samples"):
+        resolve_cv_folds(np.array([0, 0, 1]), requested_folds=3)
+
+
+def test_cv_folds_are_reduced_with_warning() -> None:
+    y = np.array([0, 0, 0, 1, 1, 1])
+
+    with pytest.warns(RuntimeWarning, match="using cv_folds=3"):
+        assert resolve_cv_folds(y, requested_folds=5) == 3
