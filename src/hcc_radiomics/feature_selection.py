@@ -77,12 +77,34 @@ def bpso_mask_cost(
     X_subset = X_train[:, selected]
     estimator = estimator or SVC(class_weight="balanced", probability=True, random_state=random_state)
     scorer = make_scorer(balanced_accuracy_score)
-    min_class_count = np.min(np.unique(y_train, return_counts=True)[1])
-    folds = max(2, min(cv_folds, int(min_class_count)))
+    folds = resolve_cv_folds(y_train, cv_folds)
     cv = StratifiedKFold(n_splits=folds, shuffle=True, random_state=random_state)
     scores = cross_val_score(clone(estimator), X_subset, y_train, cv=cv, scoring=scorer)
     feature_fraction = selected.size / total_features
     return float(alpha * (1.0 - scores.mean()) + (1.0 - alpha) * feature_fraction)
+
+
+def resolve_cv_folds(y_train, requested_folds: int) -> int:
+    if requested_folds < 2:
+        raise ValueError("cv_folds must be at least 2")
+
+    min_class_count = int(np.min(np.unique(y_train, return_counts=True)[1]))
+    if min_class_count < 2:
+        raise ValueError(
+            "Cross-validation requires at least 2 training samples in every class; "
+            f"the smallest class has {min_class_count}."
+        )
+    if requested_folds > min_class_count:
+        warnings.warn(
+            (
+                f"Requested cv_folds={requested_folds}, but the smallest training class "
+                f"has {min_class_count} samples; using cv_folds={min_class_count}."
+            ),
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return min_class_count
+    return requested_folds
 
 
 @dataclass

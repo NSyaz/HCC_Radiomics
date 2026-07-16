@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 import re
 from typing import Iterable
+import warnings
 
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit, train_test_split
 
+
+STAGE_TARGET_MAPPING = {
+    0: "HCC groups/stages 1-2",
+    1: "HCC groups/stages 3-4",
+}
 
 DEFAULT_METADATA_NAMES = {
     "id",
@@ -102,6 +109,8 @@ def validate_dataset(
     if numeric_X.shape[1] == 0:
         raise ValueError("No numeric radiomics features remain after excluding target/metadata")
 
+    _warn_high_dimensional_shape(n_samples=numeric_X.shape[0], n_features=numeric_X.shape[1])
+
     summary = {
         "n_rows": int(df.shape[0]),
         "n_columns": int(df.shape[1]),
@@ -113,10 +122,34 @@ def validate_dataset(
         "metadata_columns_excluded": metadata,
         "non_numeric_columns_excluded": non_numeric,
         "n_numeric_features": int(numeric_X.shape[1]),
+        "feature_sample_ratio": float(numeric_X.shape[1] / numeric_X.shape[0]),
+        "stage_target_mapping": {str(key): value for key, value in STAGE_TARGET_MAPPING.items()},
         "missing_feature_cells": int(numeric_X.isna().sum().sum()),
         "duplicate_rows": int(df.duplicated().sum()),
     }
     return numeric_X, y, list(numeric_X.columns), summary
+
+
+def _warn_high_dimensional_shape(n_samples: int, n_features: int) -> None:
+    if n_features >= 10 * n_samples:
+        warnings.warn(
+            (
+                f"Dataset has {n_features} features and {n_samples} samples "
+                f"(feature/sample ratio {n_features / n_samples:.1f}). "
+                "This is an extreme high-dimensional, low-sample-size setting with high overfitting risk."
+            ),
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    elif n_features > n_samples:
+        warnings.warn(
+            (
+                f"Dataset has more features ({n_features}) than samples ({n_samples}). "
+                "This high-dimensional setting has elevated overfitting risk."
+            ),
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
 
 def _class_distribution(y: pd.Series) -> dict[str, int]:
@@ -155,22 +188,33 @@ def split_dataset(
         train_idx = train_val_idx[train_pos]
         validation_idx = train_val_idx[val_pos]
     else:
-        stratify = y if y.value_counts().min() >= 2 else None
-        train_val_idx, test_idx = train_test_split(
-            y.index,
-            test_size=test_size,
-            random_state=random_state,
-            stratify=stratify,
-        )
+        _validate_stratified_split_feasibility(y, test_size, validation_size)
+        try:
+            train_val_idx, test_idx = train_test_split(
+                y.index,
+                test_size=test_size,
+                random_state=random_state,
+                stratify=y,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "Unable to create a stratified test split. Reduce test_size, collect more "
+                "samples per class, or review the target labels."
+            ) from exc
         y_train_val = y.loc[train_val_idx]
         relative_val_size = validation_size / (1.0 - test_size)
-        stratify_train_val = y_train_val if y_train_val.value_counts().min() >= 2 else None
-        train_idx, validation_idx = train_test_split(
-            train_val_idx,
-            test_size=relative_val_size,
-            random_state=random_state + 1,
-            stratify=stratify_train_val,
-        )
+        try:
+            train_idx, validation_idx = train_test_split(
+                train_val_idx,
+                test_size=relative_val_size,
+                random_state=random_state + 1,
+                stratify=y_train_val,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "Unable to create a stratified validation split from the training pool. "
+                "Reduce validation_size, collect more samples per class, or review the target labels."
+            ) from exc
 
     result = SplitResult(
         train_idx=pd.Index(train_idx),
@@ -187,6 +231,32 @@ def assert_no_overlap(split: SplitResult) -> None:
     test = set(split.test_idx)
     if train & validation or train & test or validation & test:
         raise ValueError("Train, validation, and test splits overlap")
+
+
+def _validate_stratified_split_feasibility(
+    y: pd.Series,
+    test_size: float,
+    validation_size: float,
+) -> None:
+    counts = y.value_counts()
+    if counts.min() < 3:
+        raise ValueError(
+            "Stratified train/validation/test splitting requires at least 3 samples "
+            f"per class; observed class counts are {_class_distribution(y)}."
+        )
+
+    n_classes = counts.shape[0]
+    n_samples = len(y)
+    test_n = math.ceil(test_size * n_samples)
+    train_val_n = n_samples - test_n
+    relative_val_size = validation_size / (1.0 - test_size)
+    validation_n = math.ceil(relative_val_size * train_val_n)
+    train_n = train_val_n - validation_n
+    if min(test_n, validation_n, train_n) < n_classes:
+        raise ValueError(
+            "Requested split sizes are too small to preserve every class in train, "
+            "validation, and test splits. Increase split sizes or use more samples."
+        )
 
 
 def split_class_distributions(y: pd.Series, split: SplitResult) -> dict[str, dict[str, int]]:

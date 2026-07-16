@@ -23,29 +23,38 @@ from hcc_radiomics.evaluation import (
     save_probability_curves,
 )
 from hcc_radiomics.feature_selection import apply_bpso, safe_select_k_best
-from hcc_radiomics.models import build_svm
+from hcc_radiomics.models import build_dummy, build_svm
 from hcc_radiomics.preprocessing import fit_transform_preprocessor
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run HCC radiomics classification")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run HCC radiomics classification. Confirmed Stage mapping: "
+            "0 = groups/stages 1-2, 1 = groups/stages 3-4."
+        )
+    )
     parser.add_argument("--config", type=Path, help="Optional YAML configuration file")
     parser.add_argument("--data-path", type=Path)
     parser.add_argument("--sheet-name")
-    parser.add_argument("--target-column", default="Stage")
+    parser.add_argument(
+        "--target-column",
+        default="Stage",
+        help="Target column. The confirmed default mapping is Stage 0 = groups/stages 1-2 and Stage 1 = groups/stages 3-4.",
+    )
     parser.add_argument("--group-column")
     parser.add_argument("--metadata-column", action="append", default=[])
     parser.add_argument(
         "--method",
-        choices=["svm", "svm_kbest", "svm_bpso", "svm_kbest_bpso"],
-        default="svm_bpso",
+        choices=["dummy", "svm", "svm_kbest", "svm_bpso", "svm_kbest_bpso"],
+        default="svm",
     )
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/run_001"))
     parser.add_argument("--random-state", type=int, default=42)
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--validation-size", type=float, default=0.2)
-    parser.add_argument("--k-best", type=int, default=150)
-    parser.add_argument("--bpso-particles", type=int, default=30)
+    parser.add_argument("--k-best", type=int, default=10)
+    parser.add_argument("--bpso-particles", type=int, default=20)
     parser.add_argument("--bpso-iterations", type=int, default=10)
     parser.add_argument("--bpso-alpha", type=float, default=0.9)
     parser.add_argument("--cv-folds", type=int, default=3)
@@ -154,7 +163,11 @@ def run_experiment(config: dict[str, Any]) -> dict[str, Any]:
         selected_names = bpso_result.feature_names
         selection_steps.append(bpso_result.metadata)
 
-    model = build_svm(random_state=int(config["random_state"]))
+    if method == "dummy":
+        selection_steps.append({"method": "none", "note": "DummyClassifier stratified baseline"})
+        model = build_dummy(random_state=int(config["random_state"]))
+    else:
+        model = build_svm(random_state=int(config["random_state"]))
     model.fit(X_train_t, y_train)
 
     labels = sorted(y.unique(), key=str)
