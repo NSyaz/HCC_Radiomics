@@ -1,0 +1,6 @@
+cff-version: 1.2.0
+title: "HCC Radiomics Classification"
+type: software
+version: "0.1.0"
+repository-code: "https://github.com/NSyaz/HCC_Radiomics"
+message: "If you use this repository, please cite the repository and any associated dataset or manuscript once those details are available."

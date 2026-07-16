@@ -1,0 +1,37 @@
+name: Experiment request
+description: Propose a modelling or validation experiment
+title: "[Experiment]: "
+labels: ["experiment"]
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What scientific or technical question should this experiment answer?
+    validations:
+      required: true
+  - type: dropdown
+    id: method
+    attributes:
+      label: Method
+      options:
+        - dummy
+        - svm
+        - svm_kbest
+        - svm_bpso
+        - svm_kbest_bpso
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: Describe splits, repeated validation, or uncertainty estimates.
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Data privacy
+      options:
+        - label: This request does not require committing patient-level data.
+          required: true

@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Local research data must not be committed.
+data/*
+!data/README.md
+!data/.gitkeep
+*.xlsx
+*.xls
+*.csv
+*.tsv
+
+# Generated experiment outputs.
+outputs/*
+!outputs/.gitkeep
+
+# Local/editor files.
+.DS_Store
+.idea/
+.vscode/

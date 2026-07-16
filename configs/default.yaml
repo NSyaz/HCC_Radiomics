@@ -1,0 +1,27 @@
+data_path: data/hcc_radiomics.xlsx
+sheet_name: null
+
+# Confirmed target mapping:
+#   0 = HCC groups/stages 1-2
+#   1 = HCC groups/stages 3-4
+target_column: Stage
+
+# The current dataset has one row per patient, so grouped splitting is not
+# required by default. Keep this option for future repeated-patient datasets.
+group_column: null
+metadata_columns: []
+
+# Supported methods:
+#   dummy, svm, svm_kbest, svm_bpso, svm_kbest_bpso
+method: svm
+output_dir: outputs/run_001
+random_state: 42
+test_size: 0.2
+validation_size: 0.2
+
+# Initial development value only; tune inside training validation.
+k_best: 10
+bpso_particles: 20
+bpso_iterations: 10
+bpso_alpha: 0.9
+cv_folds: 3

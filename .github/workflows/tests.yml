@@ -1,0 +1,35 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - codex/rebuild-hcc-radiomics
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Compile Python files
+        run: python -m compileall .
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Check tracked patient data
+        run: python scripts/check_no_tracked_patient_data.py
