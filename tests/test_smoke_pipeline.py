@@ -107,7 +107,7 @@ def test_all_documented_methods_run_on_synthetic_data(tmp_path: Path, method: st
     assert (output_dir / "metrics.json").exists()
 
 
-def test_multiclass_metrics_are_supported() -> None:
+def test_generic_multiclass_metric_utility_is_independent_of_stage_definition() -> None:
     y_true = [0, 1, 2, 0, 1, 2]
     y_pred = [0, 1, 1, 0, 2, 2]
     y_proba = pd.DataFrame(

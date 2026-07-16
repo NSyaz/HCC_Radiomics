@@ -30,3 +30,6 @@ jobs:
 
       - name: Run tests
         run: pytest -q
+
+      - name: Check tracked patient data
+        run: python scripts/check_no_tracked_patient_data.py

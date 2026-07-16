@@ -22,6 +22,7 @@ from hcc_radiomics.evaluation import (
     save_confusion_matrix,
     save_probability_curves,
 )
+from hcc_radiomics.experiment import ExperimentBundle, BUNDLE_FORMAT_VERSION
 from hcc_radiomics.feature_selection import apply_bpso, safe_select_k_best
 from hcc_radiomics.models import build_dummy, build_svm
 from hcc_radiomics.preprocessing import fit_transform_preprocessor
@@ -124,6 +125,9 @@ def run_experiment(config: dict[str, Any]) -> dict[str, Any]:
     method = config["method"]
     selection_steps: list[dict[str, Any]] = []
     selected_names = transformed_names
+    fitted_kbest = None
+    bpso_mask = None
+    bpso_input_feature_names = None
 
     if method in {"svm_kbest", "svm_kbest_bpso"}:
         k_result = safe_select_k_best(
@@ -141,8 +145,10 @@ def run_experiment(config: dict[str, Any]) -> dict[str, Any]:
         )
         selected_names = k_result.feature_names
         selection_steps.append(k_result.metadata)
+        fitted_kbest = k_result.selector
 
     if method in {"svm_bpso", "svm_kbest_bpso"}:
+        bpso_input_feature_names = list(selected_names)
         bpso_result = apply_bpso(
             X_train_t,
             y_train,
@@ -162,6 +168,7 @@ def run_experiment(config: dict[str, Any]) -> dict[str, Any]:
         )
         selected_names = bpso_result.feature_names
         selection_steps.append(bpso_result.metadata)
+        bpso_mask = bpso_result.mask
 
     if method == "dummy":
         selection_steps.append({"method": "none", "note": "DummyClassifier stratified baseline"})
@@ -171,8 +178,25 @@ def run_experiment(config: dict[str, Any]) -> dict[str, Any]:
     model.fit(X_train_t, y_train)
 
     labels = sorted(y.unique(), key=str)
-    validation_result = _evaluate_split(model, X_validation_t, y_validation, labels)
-    test_result = _evaluate_split(model, X_test_t, y_test, labels)
+    bundle = ExperimentBundle(
+        method=method,
+        target_column=target_column,
+        metadata_columns=metadata_columns,
+        input_feature_names=feature_names,
+        transformed_feature_names=transformed_names,
+        selected_feature_names=selected_names,
+        class_labels=labels,
+        preprocessor=preprocessor,
+        select_k_best=fitted_kbest,
+        bpso_mask=bpso_mask,
+        bpso_input_feature_names=bpso_input_feature_names,
+        classifier=model,
+        config=_serialisable_config(config),
+        model_format_version=BUNDLE_FORMAT_VERSION,
+        extra_metadata={"selection_steps": selection_steps},
+    )
+    validation_result = _evaluate_dataframe(bundle, X_validation, y_validation, labels)
+    test_result = _evaluate_dataframe(bundle, X_test, y_test, labels)
 
     config_to_save = _serialisable_config(config)
     artifacts = {
@@ -212,14 +236,26 @@ def run_experiment(config: dict[str, Any]) -> dict[str, Any]:
     if proba is not None:
         save_probability_curves(y_test, proba, labels, output_dir)
 
-    joblib.dump({"preprocessor": preprocessor, "model": model, "features": selected_names}, output_dir / "model.joblib")
+    joblib.dump(bundle, output_dir / "model.joblib")
     logging.info("Experiment completed")
+    artifacts["bundle"] = bundle
+    artifacts["test_indices"] = [str(idx) for idx in y_test.index]
     return artifacts
 
 
 def _evaluate_split(model, X, y, labels: list[Any]) -> dict[str, Any]:
     y_pred = model.predict(X)
     y_proba = model.predict_proba(X) if hasattr(model, "predict_proba") else None
+    return {
+        "y_pred": y_pred,
+        "y_proba": y_proba,
+        "metrics": classification_metrics(y, y_pred, y_proba, labels),
+    }
+
+
+def _evaluate_dataframe(bundle: ExperimentBundle, X: pd.DataFrame, y, labels: list[Any]) -> dict[str, Any]:
+    y_pred = bundle.predict(X)
+    y_proba = bundle.predict_proba(X)
     return {
         "y_pred": y_pred,
         "y_proba": y_proba,

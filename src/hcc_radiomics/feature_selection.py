@@ -19,6 +19,7 @@ class SelectionResult:
     feature_names: list[str]
     mask: np.ndarray
     metadata: dict
+    selector: object | None = None
 
 
 def safe_select_k_best(
@@ -55,6 +56,7 @@ def safe_select_k_best(
         feature_names=selected_names,
         mask=mask,
         metadata={"method": "select_k_best", "requested_k": k, "selected_k": selected_k},
+        selector=selector,
     )
 
 
@@ -232,4 +234,5 @@ def apply_bpso(
             "cost": selector.cost_,
             "history": selector.history_,
         },
+        selector=selector,
     )

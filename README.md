@@ -7,7 +7,7 @@ The confirmed target column is `Stage`:
 - `0` = HCC groups/stages 1-2
 - `1` = HCC groups/stages 3-4
 
-The software preserves this mapping and does not reinterpret or transform the target definition.
+The software preserves this mapping and does not reinterpret or remap the target definition. When `--target-column Stage` is used, labels must be exactly `0` and `1`; lossless numeric `0.0` and `1.0` values are canonicalised to integers, while booleans, strings, `{1, 2}`, multiclass labels, missing labels, and single-class datasets are rejected.
 
 ## Project Overview
 
@@ -24,6 +24,8 @@ The planned modelling comparison focuses on five methods:
 - `svm_kbest_bpso`: ANOVA F-test followed by BPSO and SVM.
 
 The scientific objective is to compare these methods on the same train, validation, and test splits without fitting preprocessing, feature selection, BPSO, or model parameters on the final test set.
+
+PR #1 is a repository recovery and infrastructure PR. It is not the final modelling study, and it does not report real-data model performance.
 
 ## Dataset Characteristics
 
@@ -192,6 +194,23 @@ The current implementation supports leakage-safe train, validation, and final te
 
 Because the dataset is very small relative to the number of predictors, final real-data conclusions should use repeated stratified validation or nested cross-validation before reporting scientific claims. Nested cross-validation is recommended for the final study design but is not implemented in this repository yet.
 
+## Inference From A Saved Bundle
+
+Each experiment writes `model.joblib`, which stores the full inference bundle: original feature schema and order, excluded metadata columns, fitted preprocessing, fitted ANOVA selector when used, fitted BPSO mask when used, class-label order, final classifier, method name, configuration, and bundle format version.
+
+```python
+import pandas as pd
+from hcc_radiomics import load_experiment
+
+bundle = load_experiment("outputs/svm_kbest_bpso/model.joblib")
+new_data = pd.read_excel("data/hcc_radiomics.xlsx")
+
+predictions = bundle.predict(new_data)
+probabilities = bundle.predict_proba(new_data)
+```
+
+The bundle accepts a `DataFrame` containing the original radiomics columns, ignores additional unrelated columns, reorders columns to match training, applies the fitted preprocessing and feature selection, and never refits components during inference. Missing required feature columns raise a clear error.
+
 ## Testing
 
 Tests use synthetic data only and do not require private research data:
@@ -204,6 +223,21 @@ pytest -q
 ## Data Privacy
 
 Real research data are ignored by Git and must remain local. Do not commit Excel workbooks, CSV exports, TSV files, patient identifiers, clinical free text, accessions, dates of birth, credentials, private institutional metadata, or derived row-level patient data.
+
+The repository includes `scripts/check_no_tracked_patient_data.py`, and CI runs it against Git-tracked files to prevent accidental workbook or row-level data commits.
+
+## Next Phase
+
+Before real-data scientific conclusions are reported, the next experiment phase should include:
+
+1. Authorised local dataset validation.
+2. Class-distribution verification.
+3. Repeated stratified nested cross-validation.
+4. Inner-loop feature selection and hyperparameter tuning.
+5. Feature-selection stability analysis.
+6. Confidence intervals.
+7. Comparison against the stratified dummy baseline.
+8. A locked final reporting protocol.
 
 ## Legacy Code
 

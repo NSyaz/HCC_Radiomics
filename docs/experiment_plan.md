@@ -14,3 +14,14 @@ This document describes the intended real-data workflow. It is not a report of c
 10. Produce final tables and figures only after real-data validation is complete.
 
 Single split results should be treated as exploratory. Final scientific conclusions should include uncertainty and avoid claiming model performance from one split alone.
+
+## Next-Phase Requirements
+
+1. Authorised local dataset validation.
+2. Class-distribution verification.
+3. Repeated stratified nested cross-validation.
+4. Inner-loop feature selection and hyperparameter tuning.
+5. Feature-selection stability analysis.
+6. Confidence intervals.
+7. Comparison against the stratified dummy baseline.
+8. Locked final reporting protocol.

@@ -86,7 +86,7 @@ def validate_dataset(
         missing = int(df[target_column].isna().sum())
         raise ValueError(f"Target column '{target_column}' has {missing} missing labels")
 
-    y = df[target_column]
+    y = _validate_and_canonicalise_target(df[target_column], target_column)
     class_count = y.nunique(dropna=False)
     if class_count < 2:
         raise ValueError("Classification requires at least two target classes")
@@ -128,6 +128,38 @@ def validate_dataset(
         "duplicate_rows": int(df.duplicated().sum()),
     }
     return numeric_X, y, list(numeric_X.columns), summary
+
+
+def _validate_and_canonicalise_target(y: pd.Series, target_column: str) -> pd.Series:
+    if target_column != "Stage":
+        return y
+
+    if pd.api.types.is_bool_dtype(y) or any(isinstance(value, (bool, np.bool_)) for value in y.dropna()):
+        raise ValueError(
+            "Stage must use integer labels 0 and 1; boolean labels are not accepted."
+        )
+
+    if not pd.api.types.is_numeric_dtype(y):
+        raise ValueError(
+            "Stage must use numeric labels exactly 0 and 1. String labels are not accepted."
+        )
+
+    numeric = pd.to_numeric(y, errors="raise")
+    if not np.all(np.isin(numeric.to_numpy(), [0, 1])):
+        observed = sorted(pd.unique(y), key=str)
+        raise ValueError(
+            f"Stage must contain exactly the labels 0 and 1; observed labels were {observed}."
+        )
+    if not np.all(numeric.to_numpy() == np.floor(numeric.to_numpy())):
+        raise ValueError("Stage labels must be losslessly convertible to integers 0 and 1.")
+
+    canonical = numeric.astype(int)
+    observed_classes = set(canonical.unique())
+    if observed_classes != {0, 1}:
+        raise ValueError(
+            f"Stage must contain both labels 0 and 1; observed labels were {sorted(observed_classes)}."
+        )
+    return pd.Series(canonical.to_numpy(), index=y.index, name=y.name)
 
 
 def _warn_high_dimensional_shape(n_samples: int, n_features: int) -> None:

@@ -18,6 +18,8 @@ Accepted formats are `.xlsx`, `.xls`, `.csv`, `.tsv`, and tab-delimited `.txt`.
   - `0` = HCC groups/stages 1-2
   - `1` = HCC groups/stages 3-4
 
+When the target column is `Stage`, only labels `0` and `1` are accepted. Lossless numeric `0.0` and `1.0` values are converted to integers. Strings, booleans, missing labels, `{1, 2}`, multiclass labels, and single-class datasets are rejected.
+
 All approved numeric columns other than `Stage` are treated as candidate predictors unless explicitly excluded as metadata.
 
 ## Metadata Columns

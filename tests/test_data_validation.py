@@ -41,7 +41,47 @@ def test_target_mapping_constant_remains_binary() -> None:
 def test_missing_or_single_class_target_is_rejected() -> None:
     df = pd.DataFrame({"Stage": [1, 1, 1], "feature": [0.1, 0.2, 0.3]})
 
-    with pytest.raises(ValueError, match="at least two"):
+    with pytest.raises(ValueError, match="Stage must contain both labels"):
+        validate_dataset(df, "Stage")
+
+
+def test_stage_accepts_valid_integer_labels() -> None:
+    df = pd.DataFrame({"Stage": [0, 1, 0, 1], "feature": [0.1, 0.2, 0.3, 0.4]})
+
+    _X, y, _features, _summary = validate_dataset(df, "Stage")
+
+    assert y.tolist() == [0, 1, 0, 1]
+
+
+def test_stage_accepts_lossless_float_labels() -> None:
+    df = pd.DataFrame({"Stage": [0.0, 1.0, 0.0, 1.0], "feature": [0.1, 0.2, 0.3, 0.4]})
+
+    _X, y, _features, _summary = validate_dataset(df, "Stage")
+
+    assert y.tolist() == [0, 1, 0, 1]
+    assert str(y.dtype).startswith("int")
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        [1, 2, 1, 2],
+        [0, 1, 2, 1],
+        ["early", "late", "early", "late"],
+        [False, True, False, True],
+    ],
+)
+def test_stage_rejects_unsupported_label_sets(labels: list[object]) -> None:
+    df = pd.DataFrame({"Stage": labels, "feature": [0.1, 0.2, 0.3, 0.4]})
+
+    with pytest.raises(ValueError, match="Stage"):
+        validate_dataset(df, "Stage")
+
+
+def test_stage_rejects_missing_labels() -> None:
+    df = pd.DataFrame({"Stage": [0, 1, None, 1], "feature": [0.1, 0.2, 0.3, 0.4]})
+
+    with pytest.raises(ValueError, match="missing labels"):
         validate_dataset(df, "Stage")
 
 

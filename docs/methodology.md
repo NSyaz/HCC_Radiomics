@@ -9,6 +9,8 @@ The binary target column is `Stage`:
 
 The active workflow preserves this mapping and does not reinterpret the clinical target.
 
+When `Stage` is the target column, the active HCC pipeline requires exactly the labels `0` and `1`. Lossless numeric `0.0` and `1.0` values are canonicalised to integers. Booleans, strings, `{1, 2}`, multiclass labels, missing labels, and single-class datasets are rejected unless a future scientifically reviewed conversion is implemented.
+
 ## Dataset Dimensions
 
 The primary dataset contains approximately 40 patients and approximately 662 radiomics predictors, with one row per patient. This is a high-dimensional, low-sample-size setting.
@@ -52,3 +54,5 @@ The pipeline reports accuracy, balanced accuracy, precision, recall/sensitivity,
 ## Validation Caution
 
 With approximately 662 predictors and approximately 40 patients, model variance and overfitting risk are substantial. Final scientific results should include repeated validation, uncertainty estimates, and feature-selection stability analysis before drawing conclusions.
+
+This PR prepares repository infrastructure and does not report real-data performance. A single train/validation/test split must not be treated as final scientific evidence. Final evaluation still requires repeated and preferably nested stratified cross-validation, inner-loop feature selection and hyperparameter tuning, confidence intervals, and a locked reporting protocol.
